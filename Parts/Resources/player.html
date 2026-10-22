@@ -1,0 +1,57 @@
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><style>html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}#player{width:100%;height:100%}</style></head>
+<body><div id="player"></div><script>
+let player, duration = 0, part = 0, completed = false, initialized = false;
+const config = __CONFIG__;
+const post = data => window.webkit.messageHandlers.player.postMessage(data);
+function choosePart(index, resume) {
+  if (!duration) return;
+  part = Math.max(0, Math.min(Math.ceil(duration / 60) - 1, index));
+  completed = false;
+  player.seekTo(resume === undefined ? part * 60 : Math.max(part * 60, Math.min(resume, Math.min(duration, (part + 1) * 60) - 0.1)), true);
+  player.playVideo();
+  report();
+}
+function report() {
+  post({type:'progress', duration:duration, time:player.getCurrentTime(), part:part, completed:completed});
+}
+function onYouTubeIframeAPIReady() {
+  player = new YT.Player('player', {
+    videoId: config.id, width:'100%',height:'100%',
+    playerVars:{playsinline:1,origin:config.origin,autoplay:0},
+    events:{
+      onReady: () => { post({type:'ready'}); },
+      onError: e => post({type:'error',code:e.data}),
+      onAutoplayBlocked: () => post({type:'blocked'}),
+      onStateChange: e => {
+        if (e.data === 1 && completed) choosePart(part);
+        if (e.data === 0 && initialized) { completed = true; report(); }
+      }
+    }
+  });
+}
+setInterval(() => {
+  if (!player || !player.getDuration) return;
+  const length = player.getDuration();
+  if (!length || !Number.isFinite(length)) return;
+  if (player.getVideoData().isLive) { player.pauseVideo(); post({type:'error',code:'live'}); return; }
+  duration = length;
+  if (!initialized) {
+    initialized = true;
+    const resume = Math.min(Math.max(0, config.position), Math.max(0, duration - 0.5));
+    part = Math.floor(resume / 60);
+    if (resume > 0) player.seekTo(resume, true);
+  }
+  const time = player.getCurrentTime();
+  const end = Math.min(duration, (part + 1) * 60);
+  if (!completed && player.getPlayerState() === 1) {
+    if (time >= end - 0.15) { completed = true; player.pauseVideo(); }
+    else if (time < part * 60 - 0.5) { player.seekTo(part * 60, true); }
+  }
+  report();
+}, 250);
+const script = document.createElement('script');
+script.src = 'https://www.youtube.com/iframe_api';
+script.onerror = () => post({type:'error',code:'network'});
+document.head.appendChild(script);
+</script></body></html>
