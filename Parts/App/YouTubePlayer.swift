@@ -6,7 +6,7 @@ final class Playback: ObservableObject {
     @Published var duration: Double = 0
     @Published var position: Double = 0
     @Published var part = 0
-    @Published var completed = false
+    @Published var playing = false
     @Published var ready = false
     @Published var error: String?
     weak var webView: WKWebView?
@@ -15,6 +15,11 @@ final class Playback: ObservableObject {
         guard timeline.count > 0 else { return }
         let index = min(max(index, 0), timeline.count - 1)
         webView?.evaluateJavaScript("choosePart(\(index))")
+    }
+    func toggle() { webView?.evaluateJavaScript("togglePlayback()") }
+    func seek(to offset: Double) {
+        guard offset.isFinite else { return }
+        webView?.evaluateJavaScript("seekWithinPart(\(max(0, offset)))")
     }
     func pause() { webView?.evaluateJavaScript("if(player && player.pauseVideo) player.pauseVideo()") }
 }
@@ -63,7 +68,7 @@ struct YouTubePlayer: UIViewRepresentable {
                 playback.duration = duration
                 playback.position = max(0, min(time, duration))
                 playback.part = data["part"] as? Int ?? 0
-                playback.completed = data["completed"] as? Bool ?? false
+                playback.playing = data["playing"] as? Bool ?? false
             case "error":
                 let code = String(describing: data["code"] ?? "unknown")
                 switch code {

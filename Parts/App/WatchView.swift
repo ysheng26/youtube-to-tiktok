@@ -8,6 +8,7 @@ struct WatchView: View {
     @StateObject private var playback = Playback()
     @State private var showParts = false
     @State private var slow = false
+    @State private var scrubPosition: Double?
     @State private var lastSaved = Date.distantPast
     private let accent = Color(red: 0.73, green: 0.98, blue: 0.36)
     var body: some View {
@@ -35,26 +36,41 @@ struct WatchView: View {
                 } else if playback.duration == 0 {
                     VStack(spacing: 8) {
                         if !playback.ready { ProgressView().tint(accent) }
-                        Text(playback.ready ? "Tap play above to start your series." : "Getting your video ready…").font(.subheadline).foregroundStyle(.secondary)
+                        Text(playback.ready ? "Tap play to start your series." : "Getting your video ready…").font(.subheadline).foregroundStyle(.secondary)
+                        if playback.ready {
+                            Button("Play video", systemImage: "play.fill") { playback.toggle() }.buttonStyle(.borderedProminent)
+                        }
                         if slow { Text("Still waiting? Check your connection, or try another video.").font(.caption).foregroundStyle(.secondary) }
                     }
                 } else {
-                    ProgressView(value: min(1, max(0, (playback.position - playback.timeline.start(playback.part)) / max(1, playback.timeline.end(playback.part) - playback.timeline.start(playback.part)))))
-                        .tint(accent)
+                    HStack(spacing: 16) {
+                        Button { playback.toggle() } label: {
+                            Image(systemName: playback.playing ? "pause.fill" : "play.fill").font(.title2).frame(width: 44, height: 44)
+                        }.accessibilityLabel(playback.playing ? "Pause" : "Play")
+                        Slider(value: Binding(
+                            get: { scrubPosition ?? partPosition },
+                            set: { scrubPosition = $0 }
+                        ), in: 0...max(0.1, partDuration), onEditingChanged: { editing in
+                            if !editing, let offset = scrubPosition {
+                                playback.seek(to: offset)
+                                scrubPosition = nil
+                            }
+                        }).tint(accent).accessibilityLabel("Position within this part")
+                    }
                     HStack {
-                        Text("\(playback.timeline.start(playback.part).timestamp) – \(playback.timeline.end(playback.part).timestamp)")
+                        Text("\((scrubPosition ?? partPosition).timestamp) / \(partDuration.timestamp)")
                         Spacer()
                         Button { showParts = true } label: { Label("All parts", systemImage: "square.grid.2x2") }
                     }.font(.caption.monospaced()).foregroundStyle(.secondary)
                     HStack(spacing: 20) {
                         Button { playback.go(to: playback.part - 1) } label: { Image(systemName: "arrow.down").padding(18).background(.white.opacity(0.08), in: Circle()) }
                             .disabled(playback.part == 0).accessibilityLabel("Previous part")
-                        Button { playback.go(to: playback.completed && playback.part == playback.timeline.count - 1 ? 0 : playback.part + 1) } label: {
-                            HStack { Text(playback.completed && playback.part == playback.timeline.count - 1 ? "Watch again" : "Next part"); Image(systemName: "arrow.up") }
+                        Button { playback.go(to: playback.part + 1) } label: {
+                            HStack { Text("Next part"); Image(systemName: "arrow.up") }
                                 .font(.headline).frame(maxWidth: .infinity).padding(18).background(accent, in: Capsule()).foregroundStyle(.black)
-                        }.disabled(!playback.completed && playback.part == playback.timeline.count - 1)
+                        }.disabled(playback.part == playback.timeline.count - 1)
                     }.buttonStyle(.plain)
-                    Text(playback.completed ? (playback.part == playback.timeline.count - 1 ? "That’s the whole rabbit hole. Nice." : "Part finished. Swipe up for the next one.") : "Swipe up here for the next part")
+                    Text(playback.part == playback.timeline.count - 1 ? "Final part · Loops until you leave" : "This part loops · Swipe up for the next one")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(24).frame(maxWidth: .infinity, minHeight: 200).contentShape(Rectangle())
@@ -89,10 +105,15 @@ struct WatchView: View {
             .onChange(of: playback.position) { _, _ in
                 if Date().timeIntervalSince(lastSaved) >= 5 { save() }
             }
-            .onChange(of: playback.part) { _, _ in save() }
-            .onChange(of: playback.completed) { _, _ in save() }
+            .onChange(of: playback.part) { _, _ in scrubPosition = nil; save() }
             .onChange(of: scenePhase) { _, phase in if phase != .active { playback.pause(); save() } }
             .onDisappear { playback.pause(); save() }
+    }
+    private var partDuration: Double {
+        playback.timeline.end(playback.part) - playback.timeline.start(playback.part)
+    }
+    private var partPosition: Double {
+        min(max(0, playback.position - playback.timeline.start(playback.part)), max(0, partDuration))
     }
     private func save() {
         lastSaved = Date()
