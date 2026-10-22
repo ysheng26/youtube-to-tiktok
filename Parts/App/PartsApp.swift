@@ -8,6 +8,7 @@ struct PartsApp: App {
         WindowGroup {
             LibraryView().environmentObject(library).preferredColorScheme(.dark)
                 .tint(.mint)
+                .onOpenURL { library.receiveWatchLink($0) }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { library.importSharedVideos() }
                 }
@@ -18,7 +19,8 @@ struct PartsApp: App {
 @MainActor
 final class Library: ObservableObject {
     @Published var videos: [SavedVideo] = []
-    @Published var sharedVideoIDToOpen: String?
+    @Published var watchRequest: WatchRequest?
+    @Published var watchLinkError: String?
     private let key = "parts.library.v1"
     init() {
         if let data = UserDefaults.standard.data(forKey: key),
@@ -41,8 +43,23 @@ final class Library: ObservableObject {
         guard let data = try? JSONEncoder().encode(updated) else { return }
         UserDefaults.standard.set(data, forKey: key)
         videos = updated
-        sharedVideoIDToOpen = pending.last?.entry.videoID
         for (url, _) in pending { try? inbox.acknowledge(url) }
+    }
+    struct WatchRequest: Equatable, Identifiable {
+        let id = UUID()
+        let videoID: String
+    }
+    func receiveWatchLink(_ url: URL) {
+        guard let id = PartsLink.videoID(from: url) else {
+            watchLinkError = "This link doesn’t contain a supported YouTube video."
+            return
+        }
+        watchLinkError = nil
+        _ = open(id)
+        watchRequest = WatchRequest(videoID: id)
+    }
+    func acknowledgeWatchRequest(_ request: WatchRequest) {
+        if watchRequest == request { watchRequest = nil }
     }
     func save(_ video: SavedVideo) {
         if let index = videos.firstIndex(where: { $0.id == video.id }) { videos[index] = video }

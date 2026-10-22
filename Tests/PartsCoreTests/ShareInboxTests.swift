@@ -35,3 +35,22 @@ final class ShareInboxTests: XCTestCase {
         XCTAssertEqual(try inbox.pending().count, 1)
     }
 }
+
+final class PartsLinkTests: XCTestCase {
+    private func link(_ value: String) -> URL {
+        var url = URLComponents(string: "parts://watch")!
+        url.queryItems = [URLQueryItem(name: "url", value: value)]
+        return url.url!
+    }
+    func testShortcutLinkWithYouTubeQueryParameters() {
+        XCTAssertEqual(PartsLink.videoID(from: link("https://www.youtube.com/watch?v=aqz-KE-bpKQ&si=test&t=15")), "aqz-KE-bpKQ")
+        XCTAssertEqual(PartsLink.videoID(from: link("A video 🎬\nhttps://youtu.be/aqz-KE-bpKQ?si=abc")), "aqz-KE-bpKQ")
+    }
+    func testRejectsUnsupportedOrMalformedWatchLinks() {
+        for value in ["parts://watch", "parts://save?url=https://youtu.be/aqz-KE-bpKQ", "https://watch?url=https://youtu.be/aqz-KE-bpKQ", "parts://user@watch?url=https://youtu.be/aqz-KE-bpKQ", "parts://watch/other?url=https://youtu.be/aqz-KE-bpKQ", "parts://watch?url=https://youtu.be/aqz-KE-bpKQ&url=https://youtu.be/jfKfPfyJRdk"] {
+            XCTAssertNil(PartsLink.videoID(from: URL(string: value)!))
+        }
+        XCTAssertNil(PartsLink.videoID(from: link("https://youtube.com.evil.com/watch?v=aqz-KE-bpKQ")))
+        XCTAssertNil(PartsLink.videoID(from: link("hello")))
+    }
+}

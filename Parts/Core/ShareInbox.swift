@@ -40,3 +40,16 @@ struct ShareInbox {
     func acknowledge(_ url: URL) throws { try FileManager.default.removeItem(at: url) }
     enum InboxError: Error { case invalidVideo }
 }
+
+/// Public entry point used by the Watch in Parts Share Sheet shortcut.
+enum PartsLink {
+    static func videoID(from url: URL) -> String? {
+        guard url.scheme?.lowercased() == "parts", url.host?.lowercased() == "watch",
+              url.user == nil, url.password == nil, url.port == nil,
+              url.path.isEmpty || url.path == "/",
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return nil }
+        let values = items.filter { $0.name == "url" }
+        guard values.count == 1, let text = values.first?.value else { return nil }
+        return VideoLink.sharedID(from: text)
+    }
+}

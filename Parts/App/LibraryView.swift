@@ -2,9 +2,12 @@ import SwiftUI
 
 struct LibraryView: View {
     @EnvironmentObject private var library: Library
+    @Environment(\.scenePhase) private var scenePhase
     @State private var link = ""
     @State private var validation: String?
     @State private var selected: SavedVideo?
+    @State private var presentedRequest: Library.WatchRequest?
+    @State private var dismissingPlayer = false
     @FocusState private var editing: Bool
     private let accent = Color(red: 0.73, green: 0.98, blue: 0.36)
     var body: some View {
@@ -67,20 +70,44 @@ struct LibraryView: View {
                         .font(.caption).foregroundStyle(.tertiary).frame(maxWidth: .infinity).padding(.vertical, 16)
                 }.padding(24)
             }.background(Color(red: 0.045, green: 0.055, blue: 0.05)).toolbar(.hidden, for: .navigationBar)
-                .fullScreenCover(item: $selected, onDismiss: openSharedVideo) { video in WatchView(video: video).environmentObject(library) }
-                .onChange(of: library.sharedVideoIDToOpen, initial: true) { _, id in
-                    guard id != nil else { return }
-                    // Dismiss an existing player before presenting the shared video.
-                    // This preserves progress and creates a fresh YouTube player.
-                    if selected != nil { selected = nil }
-                    else { openSharedVideo() }
+        }
+        .fullScreenCover(item: $selected, onDismiss: {
+            dismissingPlayer = false
+            presentedRequest = nil
+            openRequestedVideo()
+        }) { video in
+            WatchView(video: video).environmentObject(library)
+                .onAppear {
+                    if let request = presentedRequest, request.videoID == video.id {
+                        library.acknowledgeWatchRequest(request)
+                    }
                 }
         }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            library.importSharedVideos()
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            openRequestedVideo()
+        }
+        .onChange(of: library.watchRequest) { _, _ in openRequestedVideo() }
+        .alert("Couldn’t open video", isPresented: Binding(
+            get: { library.watchLinkError != nil },
+            set: { if !$0 { library.watchLinkError = nil } }
+        )) { Button("OK", role: .cancel) { library.watchLinkError = nil } }
+        message: { Text(library.watchLinkError ?? "") }
     }
-    private func openSharedVideo() {
-        guard let id = library.sharedVideoIDToOpen else { return }
-        library.sharedVideoIDToOpen = nil
-        selected = library.open(id)
+    private func openRequestedVideo() {
+        guard scenePhase == .active, !dismissingPlayer, let request = library.watchRequest else { return }
+        guard presentedRequest != request else { return }
+        if selected != nil {
+            dismissingPlayer = true
+            selected = nil
+            return
+        }
+        editing = false
+        presentedRequest = request
+        selected = library.open(request.videoID)
     }
     private func openLink() {
         guard let id = VideoLink.sharedID(from: link) else { validation = "Use a YouTube video link, like youtube.com/watch?v=… or youtu.be/…"; return }

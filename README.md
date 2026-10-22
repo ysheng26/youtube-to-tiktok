@@ -15,12 +15,18 @@ Tap Play below the YouTube player to begin if playback does not start automatica
 
 1. In Xcode, select both **Parts** and **PartsShare** targets and enable **App Groups** under **Signing & Capabilities**. Use the same development team and select `group.com.shengy.parts` for both targets. Both entitlements files already declare this group; your Apple developer team must register/provision it. If this group is unavailable to your team, choose a unique group and update both entitlements files and `ShareInbox.appGroup` in `Parts/Core/ShareInbox.swift` to match.
 2. Build and reinstall **Parts** so iOS registers its embedded extension.
-3. In YouTube or Safari, tap **Share**, choose **Parts** (look under **More** if needed), then tap **Save video** and **Done**.
-4. Open or return to Parts. The latest shared video opens automatically; every shared video is also saved in your library.
+3. In YouTube or Safari, tap **Share**, choose **Save to Parts** (look under **More** if needed), then tap **Save video** and **Done**.
+4. Open or return to Parts. The video is saved in your library; tap it whenever you want to watch.
 
-The extension saves a link; it does not launch the main app automatically. Links wait in an App Group inbox while Parts is closed and import when it launches or becomes active. Sharing an existing video preserves its playback progress. If a video is already open when you return, Parts saves it and switches to the shared video. Non-YouTube links show an explanation instead of being added. If signing reports an App Group error, check the group registration, both targets’ team and bundle IDs, and their provisioning profiles. Copy/paste remains available without the extension.
+The extension saves a link; it does not launch the main app automatically. Links wait in an App Group inbox while Parts is closed and import when it launches or becomes active. Sharing an existing video preserves its playback progress. Non-YouTube links show an explanation instead of being added. If signing reports an App Group error, check the group registration, both targets’ team and bundle IDs, and their provisioning profiles. Copy/paste remains available without the extension.
 
-Device smoke test: share a video while Parts is closed, reopen it, verify it opens automatically and appears in the library, watch part of it, then share it again and confirm the saved progress remains. Also try sharing from Safari, unsupported text, and several videos before reopening Parts.
+Device smoke test: share a video while Parts is closed, reopen it, verify it appears in the library without forcing playback, watch part of it, then share it again and confirm the saved progress remains. Also try sharing from Safari, unsupported text, and several videos before reopening Parts.
+
+## Watch immediately from the Share Sheet
+
+Create the separate **Watch in Parts** shortcut using the [setup instructions](Shortcuts/README.md). It opens the app with a `parts://watch?url=…` link, saves the video, and goes straight to the player. It works without an App Group; the **Save to Parts** extension still uses its shared inbox. The shortcut requires one-time setup in Shortcuts and is not installed automatically with the app.
+
+The app validates incoming YouTube links, handles launches while closed or already running, and waits for the player to appear before acknowledging the request. A new request dismisses an existing player before opening the requested video, preserving the previous video’s progress.
 
 ## Scope
 
@@ -39,7 +45,7 @@ xcodebuild -project Parts.xcodeproj -scheme Parts -sdk iphonesimulator \
 
 Swift tests cover link validation, shared-text extraction, the shared inbox, part boundaries, and persisted progress. Node tests execute the actual bundled player script with a simulated YouTube API to check looping boundaries, navigation, final parts, pause, seeking, and resume.
 
-The app and embedded Share Extension build successfully for the iOS simulator with signing disabled. All six Swift tests pass, including the shared inbox tests. The environment blocks CoreSimulator service access, so Share Sheet behavior and real YouTube playback still need a simulator or device smoke test. Physical-device builds also require provisioning the App Group for both targets.
+The app and Share Extension Swift sources pass compiler checks. Earlier simulator builds passed; with the new app icon, full asset compilation is blocked here by unavailable CoreSimulator runtimes. All eight Swift tests pass, including the shared inbox tests. The environment blocks CoreSimulator service access, so Share Sheet behavior and real YouTube playback still need a simulator or device smoke test. Physical-device builds also require provisioning the App Group for both targets.
 
 ## Implementation
 

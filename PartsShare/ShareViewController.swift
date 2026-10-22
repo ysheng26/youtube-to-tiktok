@@ -84,7 +84,7 @@ private struct ShareScreen: View {
                 if model.loading {
                     ProgressView("Reading video link…")
                 } else if model.saved {
-                    Text("Return to Parts and your video will open automatically.").foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Text("Saved for later. Open Parts whenever you’re ready to watch.").foregroundStyle(.secondary).multilineTextAlignment(.center)
                 } else if let id = model.videoID {
                     Text("youtube.com/watch?v=\(id)").font(.subheadline.monospaced()).foregroundStyle(.secondary)
                     Text("Add this video to your library to watch later.").font(.subheadline).foregroundStyle(.secondary)
