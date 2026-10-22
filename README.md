@@ -6,14 +6,27 @@ A small native iOS app that turns a YouTube video into a swipeable series of one
 
 1. Open `Parts.xcodeproj` in Xcode.
 2. Select the **Parts** scheme and an iPhone simulator, then Run (⌘R).
-3. For a physical iPhone, choose your development team under **Signing & Capabilities** and select your device. The app supports iOS 17 and later.
+3. For a physical iPhone, choose the same development team for **Parts** and **PartsShare** under **Signing & Capabilities**, enable the shared App Group as described below, and select your device. The app supports iOS 17 and later.
 4. Paste a YouTube link and tap **Watch in parts**, or try the sample video.
 
 Tap Play below the YouTube player to begin if playback does not start automatically. Swipe in the area below the player to move between parts, use the navigation buttons, or choose **All parts**. Each part automatically loops back to its own start until you navigate away. The play/pause button and seek bar below the video control only the current part. The last part may be shorter than a minute. Progress and the video library are saved locally; long-press a library entry to remove it.
 
+## Share from YouTube or Safari
+
+1. In Xcode, select both **Parts** and **PartsShare** targets and enable **App Groups** under **Signing & Capabilities**. Use the same development team and select `group.com.shengy.parts` for both targets. Both entitlements files already declare this group; your Apple developer team must register/provision it. If this group is unavailable to your team, choose a unique group and update both entitlements files and `ShareInbox.appGroup` in `Parts/Core/ShareInbox.swift` to match.
+2. Build and reinstall **Parts** so iOS registers its embedded extension.
+3. In YouTube or Safari, tap **Share**, choose **Parts** (look under **More** if needed), then tap **Save video** and **Done**.
+4. Open or return to Parts. The latest shared video opens automatically; every shared video is also saved in your library.
+
+The extension saves a link; it does not launch the main app automatically. Links wait in an App Group inbox while Parts is closed and import when it launches or becomes active. Sharing an existing video preserves its playback progress. If a video is already open when you return, Parts saves it and switches to the shared video. Non-YouTube links show an explanation instead of being added. If signing reports an App Group error, check the group registration, both targets’ team and bundle IDs, and their provisioning profiles. Copy/paste remains available without the extension.
+
+Device smoke test: share a video while Parts is closed, reopen it, verify it opens automatically and appears in the library, watch part of it, then share it again and confirm the saved progress remains. Also try sharing from Safari, unsupported text, and several videos before reopening Parts.
+
 ## Scope
 
-This version segments playback of the original video. It does not download, render, or export clips. The portrait watch screen uses Fit: the full video stays centered without cropping, against a clean black background. Swiping vertically moves the video with your finger and slides to the selected part; short or boundary swipes spring back. Reduce Motion uses a fade instead. The title and compact playback controls sit near the bottom. YouTube’s controls are hidden using supported player parameters; native controls sit below the video. Parts use fixed 60-second boundaries rather than detecting sentences or scenes. Link input supports watch, short, embed, live-recording, and youtu.be URLs. Live streams and videos whose creators disable embedding cannot be played as parts. Internet access is required. iOS Share Sheet importing and in-app YouTube search are not included yet.
+This version segments playback of the original video. It does not download, render, or export clips. The portrait watch screen uses Fit: the full video stays centered without cropping, against a clean black background. Swiping vertically moves the video with your finger and slides to the selected part; short or boundary swipes spring back. Reduce Motion uses a fade instead. The title and compact playback controls sit near the bottom. YouTube’s controls are hidden using supported player parameters; native controls sit below the video. Parts use fixed 60-second boundaries rather than detecting sentences or scenes. Link input supports watch, short, embed, live-recording, and youtu.be URLs. Live streams and videos whose creators disable embedding cannot be played as parts. Internet access is required. A Share Extension imports YouTube links from the iOS Share Sheet. In-app YouTube search is not included yet.
+
+YouTube owns the embedded player's overlays. `rel=0` restricts related videos to the same channel; it does not remove suggestions. `iv_load_policy=3` suppresses annotations where supported, but does not remove all end cards, branding, ads, or pause overlays. The player loops each part and restores the selected video if a suggestion changes playback. A guarantee of video-only presentation requires a video source the app can play natively, rather than a YouTube embed.
 
 ## Checks
 
@@ -24,13 +37,15 @@ xcodebuild -project Parts.xcodeproj -scheme Parts -sdk iphonesimulator \
   -configuration Debug -derivedDataPath /tmp/parts-build CODE_SIGNING_ALLOWED=NO build
 ```
 
-Swift tests cover link validation, part boundaries, and persisted progress. Node tests execute the actual bundled player script with a simulated YouTube API to check looping boundaries, navigation, final parts, pause, seeking, and resume.
+Swift tests cover link validation, shared-text extraction, the shared inbox, part boundaries, and persisted progress. Node tests execute the actual bundled player script with a simulated YouTube API to check looping boundaries, navigation, final parts, pause, seeking, and resume.
 
-During initial implementation, all six tests passed and all iOS Swift sources passed a direct compiler type check against the installed simulator SDK. Full Xcode build and simulator playback could not be verified: the local Xcode installation fails loading `IDESimulatorFoundation` due to an incompatible `DVTDownloads` framework, and the environment blocks CoreSimulator service access. Real YouTube playback still needs a simulator or device smoke test.
+The app and embedded Share Extension build successfully for the iOS simulator with signing disabled. All six Swift tests pass, including the shared inbox tests. The environment blocks CoreSimulator service access, so Share Sheet behavior and real YouTube playback still need a simulator or device smoke test. Physical-device builds also require provisioning the App Group for both targets.
 
 ## Implementation
 
 - `Parts/Core/Video.swift`: link parsing, part calculations, saved-video model.
+- `Parts/Core/ShareInbox.swift`: shared-text parsing and the file-based App Group inbox.
+- `PartsShare/`: Share Sheet extension, activation rules, and entitlements.
 - `Parts/App/`: SwiftUI screens, local library, WKWebView bridge.
 - `Parts/Resources/player.html`: YouTube IFrame API player and segment playback.
 

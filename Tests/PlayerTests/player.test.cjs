@@ -3,15 +3,18 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 function setup(position = 0, length = 125) {
-  let tick, events, options, time = 0, state = -1;
+  let tick, events, options, time = 0, state = -1, videoID = 'aqz-KE-bpKQ';
   const messages = [];
   const api = {
+    getVideoUrl: () => `https://www.youtube.com/watch?v=${videoID}`,
+    loadVideoById: options => { videoID = options.videoId; time = options.startSeconds; state = 1; },
     getDuration: () => length, getCurrentTime: () => time,
     getPlayerState: () => state, getVideoData: () => ({ isLive: false }),
     pauseVideo: () => { state = 2; }, playVideo: () => { state = 1; },
     seekTo: value => { time = value; }
   };
   const context = vm.createContext({
+    URL,
     window: { webkit: { messageHandlers: { player: { postMessage: data => messages.push(data) } } } },
     document: { createElement: () => ({}), head: { appendChild() {} } },
     setInterval: callback => { tick = callback; },
@@ -22,7 +25,7 @@ function setup(position = 0, length = 125) {
   vm.runInContext(script, context);
   context.onYouTubeIframeAPIReady();
   events.onReady();
-  return { context, api, options, ended: () => { state = 0; events.onStateChange({data: 0}); }, tick: () => tick(), messages, setTime: value => { time = value; }, state: () => state };
+  return { context, api, options, setVideo: id => { videoID = id; }, ended: () => { state = 0; events.onStateChange({data: 0}); }, tick: () => tick(), messages, setTime: value => { time = value; }, state: () => state };
 }
 test('loops the current part and advances only on request', () => {
   const p = setup(); p.tick(); p.api.playVideo(); p.setTime(60); p.tick();
@@ -98,4 +101,14 @@ test('YouTube timeline and keyboard seeking are disabled', () => {
   const p = setup();
   assert.equal(p.options.playerVars.controls, 0);
   assert.equal(p.options.playerVars.disablekb, 1);
+});
+
+test('a suggested video cannot replace the selected video or its current part', () => {
+  const p = setup(74); p.tick();
+  p.setVideo('jfKfPfyJRdk'); p.tick();
+  assert.equal(p.api.getVideoUrl(), 'https://www.youtube.com/watch?v=aqz-KE-bpKQ');
+  assert.equal(p.api.getCurrentTime(), 60);
+  p.tick();
+  assert.equal(p.messages.at(-1).part, 1);
+  assert.equal(p.state(), 1);
 });

@@ -67,11 +67,23 @@ struct LibraryView: View {
                         .font(.caption).foregroundStyle(.tertiary).frame(maxWidth: .infinity).padding(.vertical, 16)
                 }.padding(24)
             }.background(Color(red: 0.045, green: 0.055, blue: 0.05)).toolbar(.hidden, for: .navigationBar)
-                .fullScreenCover(item: $selected) { video in WatchView(video: video).environmentObject(library) }
+                .fullScreenCover(item: $selected, onDismiss: openSharedVideo) { video in WatchView(video: video).environmentObject(library) }
+                .onChange(of: library.sharedVideoIDToOpen, initial: true) { _, id in
+                    guard id != nil else { return }
+                    // Dismiss an existing player before presenting the shared video.
+                    // This preserves progress and creates a fresh YouTube player.
+                    if selected != nil { selected = nil }
+                    else { openSharedVideo() }
+                }
         }
     }
+    private func openSharedVideo() {
+        guard let id = library.sharedVideoIDToOpen else { return }
+        library.sharedVideoIDToOpen = nil
+        selected = library.open(id)
+    }
     private func openLink() {
-        guard let id = VideoLink.id(from: link) else { validation = "Use a YouTube video link, like youtube.com/watch?v=… or youtu.be/…"; return }
+        guard let id = VideoLink.sharedID(from: link) else { validation = "Use a YouTube video link, like youtube.com/watch?v=… or youtu.be/…"; return }
         validation = nil; editing = false; selected = library.open(id); link = ""
     }
     private func videoRow(_ video: SavedVideo) -> some View {

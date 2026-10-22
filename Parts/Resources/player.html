@@ -11,6 +11,17 @@ function choosePart(index, resume) {
   player.playVideo();
   report();
 }
+// Suggestions can still be displayed by YouTube. Keep playback on the selected video.
+function ensureSelectedVideo() {
+  let id;
+  try { id = new URL(player.getVideoUrl()).searchParams.get('v'); }
+  catch { return true; }
+  if (id && id !== config.id) {
+    player.loadVideoById({videoId:config.id, startSeconds:part * 60});
+    return false;
+  }
+  return true;
+}
 function togglePlayback() {
   if (!player || !player.getPlayerState) return;
   if (player.getPlayerState() === 1) player.pauseVideo();
@@ -29,19 +40,20 @@ function report() {
 function onYouTubeIframeAPIReady() {
   player = new YT.Player('player', {
     videoId: config.id, width:'100%',height:'100%',
-    playerVars:{playsinline:1,origin:config.origin,autoplay:0,controls:0,disablekb:1,fs:0},
+    playerVars:{playsinline:1,origin:config.origin,autoplay:0,controls:0,disablekb:1,fs:0,rel:0,iv_load_policy:3},
     events:{
       onReady: () => { post({type:'ready'}); },
       onError: e => post({type:'error',code:e.data}),
       onAutoplayBlocked: () => post({type:'blocked'}),
       onStateChange: e => {
+        if (!ensureSelectedVideo()) return;
         if (e.data === 0 && initialized) choosePart(part);
       }
     }
   });
 }
 setInterval(() => {
-  if (!player || !player.getDuration) return;
+  if (!player || !player.getDuration || !ensureSelectedVideo()) return;
   const length = player.getDuration();
   if (!length || !Number.isFinite(length)) return;
   if (player.getVideoData().isLive) { player.pauseVideo(); post({type:'error',code:'live'}); return; }
