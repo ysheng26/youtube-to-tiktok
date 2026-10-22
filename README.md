@@ -13,7 +13,7 @@ Tap Play below the YouTube player to begin if playback does not start automatica
 
 ## Scope
 
-This version segments playback of the original video. It does not download, render, or export clips. The portrait interface preserves the original video framing. YouTube’s controls are hidden using supported player parameters; native controls sit below the video. Parts use fixed 60-second boundaries rather than detecting sentences or scenes. Link input supports watch, short, embed, live-recording, and youtu.be URLs. Live streams and videos whose creators disable embedding cannot be played as parts. Internet access is required. iOS Share Sheet importing and in-app YouTube search are not included yet.
+This version segments playback of the original video. It does not download, render, or export clips. The portrait watch screen uses Fit: the full video stays centered without cropping, against a clean black background. Swiping vertically moves the video with your finger and slides to the selected part; short or boundary swipes spring back. Reduce Motion uses a fade instead. The title and compact playback controls sit near the bottom. YouTube’s controls are hidden using supported player parameters; native controls sit below the video. Parts use fixed 60-second boundaries rather than detecting sentences or scenes. Link input supports watch, short, embed, live-recording, and youtu.be URLs. Live streams and videos whose creators disable embedding cannot be played as parts. Internet access is required. iOS Share Sheet importing and in-app YouTube search are not included yet.
 
 ## Checks
 
